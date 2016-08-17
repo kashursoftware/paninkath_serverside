@@ -2,15 +2,70 @@ var express = require('express');
 var app = express();
 var fs = require("fs");
 
+var MongoClient = require('mongodb').MongoClient;
+var assert = require('assert');
+var ObjectId = require('mongodb').ObjectID;
+var dataBsurl = 'mongodb://localhost:27017/PANINKATH_DATABASE';
 
-var user = {
-   "user4" : {
-      "name" : "Amjad",
-      "password" : "password4",
-      "profession" : "Developer...",
-      "id": 4
-   }
-}
+var url;
+var url_parts;
+var query;
+
+var authenticateUser = function(db, callback) {
+   var cursor = db.collection('paninkathUsers').find({ "uName": query.uName, "passWord": query.pwd});
+   
+   cursor.each(function(err, doc) {
+      assert.equal(err, null);
+	  
+      if (doc != null) {
+         console.dir(doc);
+		 console.log("login successful" + doc);
+      } else {
+		 console.log("login failed" + doc);
+         callback();
+      }
+   });
+};
+
+var addUser = function(db, callback) {	
+	
+   db.collection('paninkathUsers').insertOne( {
+	   
+	   "fName" : query.fName,
+	   "lName" : query.lName,
+	   "email" : query.email,
+	   "uName" : query.userName,
+	   "passWord" : query.passWord,
+	   "cPassWord" : query.cPassWord
+   }, function(err, result) {
+    assert.equal(err, null);
+    console.log("Inserted a document into the paninkathUsers collection.");
+    callback();
+  });
+};
+
+function establishConnectionWithDBase(operation){
+	
+		MongoClient.connect(dataBsurl, function(err, db) {
+		assert.equal(null, err);
+
+		if(operation === "addUser"){
+				
+			addUser(db, function() {
+				db.close();
+			});
+		}else if (operation === "authenticateUser"){
+			
+			authenticateUser(db, function() {
+				db.close();
+			});
+		}
+		
+
+		});
+		
+
+};
 
 //Disabled CORSE to allow access from any origin
 app.use(function(req, res, next) {
@@ -21,53 +76,23 @@ app.use(function(req, res, next) {
 
 app.get('/addUser', function (req, res) {
 	
-	var url = require('url');
-	var url_parts = url.parse(req.url, true);
-	var query = url_parts.query;
-	var user = {"fName":query.uName};//,"lName":query.lName,"email":query.email,"uName":query.userName,"passWord":query.passWord,"cPassWord":query.cPassWord};
+	url = require('url');
+	url_parts = url.parse(req.url, true);
+	query = url_parts.query;
 	
-	var obj = JSON.stringify(user);
-	
-	var util = require('util');
-	fs.appendFile('public/data/paninkathUsers.json', util.inspect(user) , 'utf-8');
+	establishConnectionWithDBase("addUser");
 	
 })
 
 app.get('/loginUser', function (req, res) {
 	
-	var url = require('url');
-	var url_parts = url.parse(req.url, true);
-	var query = url_parts.query;
-	
-   fs.readFile( __dirname + "/" + "public/data/paninkathUsers.json", 'utf8', function (err, data) {
-	   
-	   var users = JSON.parse( data );	   
-       var user = users[query.uName] 
-       console.log("users"+users);
-	   console.log("query"+query.uName);
-       res.end( JSON.stringify(user));
-   });
+	url = require('url');
+	url_parts = url.parse(req.url, true);
+	query = url_parts.query;
+    establishConnectionWithDBase("authenticateUser");
 })
 
-/*app.get('/listUsers', function (req, res) {
-   fs.readFile( __dirname + "/" + "public/data/paninkathUsers.json", 'utf8', function (err, data) {
-       console.log( data );
-       res.end( data );
-   });
-})
-
-
-app.get('/:id', function (req, res) {
-   // First read existing users.
-   fs.readFile( __dirname + "/" + "data/paninkathUsers.json", 'utf8', function (err, data) {
-       users = JSON.parse( data );
-       var user = users["user" + req.params.id] 
-       console.log( user );
-       res.end( JSON.stringify(user));
-   });
-})*/
-
-var server = app.listen(3500, function () {
+var server = app.listen(3800, function () {
 
   var host = server.address().address
   var port = server.address().port
