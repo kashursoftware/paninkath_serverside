@@ -61,7 +61,7 @@ var authenticateUser = function(db, req, res, callback) {
 		return res.sendStatus(401);
 	  }
 	  
-	var expires = moment().add(9000,'days').valueOf();
+	var expires = moment().add(90000,'days').valueOf();
 	var token = jwt.encode({
 		uName: user.uName,
 		exp: expires
