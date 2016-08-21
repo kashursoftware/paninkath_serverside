@@ -1,10 +1,6 @@
 var express = require('express');
 var app = express();
-var jwt = require('jwt-simple');
 var fs = require("fs");
-var moment = require("moment");
-
-app.set('jwtTokenSecret', 'PANINKATH_SECRET');
 
 var MongoClient = require('mongodb').MongoClient;
 var assert = require('assert');
@@ -15,68 +11,27 @@ var url;
 var url_parts;
 var query;
 
-
-
-var validateToken = function(db, req, res) {
-	
-	
-	var token = (req.body && req.body.access_token) || (req.query && req.query.access_token) || req.headers['x-auth-token'];
-
-	if (token) {
-		try {
-			var decoded = jwt.decode(token, app.get('jwtTokenSecret'));
-
-			if (decoded.exp <= Date.now()) {
-				res.end('Access token has expired', 400);
-			}else{
-				
-				db.collection('paninkathUsers').findOne({ "uName": decoded.uName }, function(err, user) {
-					req.user = user;
-					console.log("TOKEN VALIDATED>>......");
-				});
-			}
-
-		} 
-		catch (err) {
-			return next();
-		}
-	} else {
-		next();
-	}
-	
-};
-
 var authenticateUser = function(db, req, res, callback) {
+   var cursor = db.collection('paninkathUsers').find({ "uName": query.uName, "passWord": query.pwd});
    
-	db.collection('paninkathUsers').findOne({ "uName": query.uName, "passWord": query.pwd}, function(err, user) {
-		
-	console.log("......user... "+user);
-	  if (err) { 
-		// user not found 
-		console.log("USER NOT Found....");
-		return res.sendStatus(401);
-	  }
-
-	  if (!user) {
-		// incorrect username
-		return res.sendStatus(401);
-	  }
+   console.log("query.uName...... "+query.uName);
+   console.log("query.pwd...... "+query.pwd);
+   
+   //console.log(db.collection('paninkathUsers').find());
+   
+   
+   cursor.each(function(err, doc) {
+      assert.equal(err, null);
 	  
-	var expires = moment().add(9000,'days').valueOf();
-	var token = jwt.encode({
-		uName: user.uName,
-		exp: expires
-	}, app.get('jwtTokenSecret'));
-	
-	console.log("user,...................... >> "+user);
-
-	res.json({
-		token : token,
-		expires: expires,
-		user: JSON.stringify(user)
-	});
-
-	});
+      if (doc != null) {
+         console.dir(doc);
+		 console.log("login successful" + doc);
+		 res.send('Success');
+      } else {
+		 console.log("login failed" + doc);
+         callback();
+      }
+   });
 };
 
 var addUser = function(db, callback) {	
@@ -113,9 +68,6 @@ function establishConnectionWithDBase(operation, req, res){
 			authenticateUser(db, req, res, function() {
 				db.close();
 			});
-		}else if(operation === "validateToken"){
-			
-			validateToken(db, req, res);
 		}
 		
 
@@ -127,8 +79,7 @@ function establishConnectionWithDBase(operation, req, res){
 //Disabled CORSE to allow access from any origin
 app.use(function(req, res, next) {
   res.header("Access-Control-Allow-Origin", "*");
-  res.header("Access-Control-Allow-Headers", "Origin, X-Auth-Token, Content-Type, Accept");
-    
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
   next();
 });
 
@@ -150,15 +101,6 @@ app.get('/loginUser', function (req, res) {
 	url_parts = url.parse(req.url, true);
 	query = url_parts.query;
     establishConnectionWithDBase("authenticateUser", req, res);
-})
-
-app.get('/welcomeUser', function (req, res, next) {
-	
-	url = require('url');
-	url_parts = url.parse(req.url, true);
-	query = url_parts.query;
-		
-    establishConnectionWithDBase("validateToken", req, res);
 })
 
 var server = app.listen(3800, function () {
