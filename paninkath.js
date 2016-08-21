@@ -50,7 +50,6 @@ var authenticateUser = function(db, req, res, callback) {
    
 	db.collection('paninkathUsers').findOne({ "uName": query.uName, "passWord": query.pwd}, function(err, user) {
 		
-	console.log("......user... "+user);
 	  if (err) { 
 		// user not found 
 		console.log("USER NOT Found....");
@@ -68,7 +67,6 @@ var authenticateUser = function(db, req, res, callback) {
 		exp: expires
 	}, app.get('jwtTokenSecret'));
 	
-	console.log("user,...................... >> "+user);
 
 	res.json({
 		token : token,
@@ -98,7 +96,6 @@ var addUser = function(db, callback) {
 
 function establishConnectionWithDBase(operation, req, res){
 	
-	console.log("dataBsurl................. "+dataBsurl);
 	
 		MongoClient.connect(dataBsurl, function(err, db) {
 		assert.equal(null, err);
@@ -137,8 +134,6 @@ app.get('/addUser', function (req, res) {
 	url = require('url');
 	url_parts = url.parse(req.url, true);
 	query = url_parts.query;
-	
-	console.log("Adding............");
 	
 	establishConnectionWithDBase("addUser");
 	
