@@ -48,7 +48,7 @@ var validateToken = function(db, req, res) {
 
 var authenticateUser = function(db, req, res, callback) {
    
-	db.collection('paninkathUsers').findOne({ "uName": query.uName, "passWord": query.pwd}, function(err, user) {
+	db.collection('paninkathUsers').findOne({ "uName": query.uName.toLowerCase(), "passWord": query.pwd}, function(err, user) {
 		
 	  if (err) { 
 		// user not found 
@@ -78,13 +78,15 @@ var authenticateUser = function(db, req, res, callback) {
 };
 
 var addUser = function(db, callback) {	
+
+   var UNameInLowerCase = query.userName.toLowerCase();
 	
    db.collection('paninkathUsers').insertOne( {
 	   
 	   "fName" : query.fName,
 	   "lName" : query.lName,
 	   "email" : query.email,
-	   "uName" : query.userName,
+	   "uName" : UNameInLowerCase,
 	   "passWord" : query.passWord,
 	   "cPassWord" : query.cPassWord
    }, function(err, result) {
