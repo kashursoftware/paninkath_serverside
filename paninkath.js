@@ -32,6 +32,7 @@ var validateToken = function(db, req, res) {
 				
 				db.collection('paninkathUsers').findOne({ "uName": decoded.uName }, function(err, user) {
 					req.user = user;
+					return res.sendStatus(200);
 					console.log("TOKEN VALIDATED>>......");
 				});
 			}
@@ -87,8 +88,7 @@ var addUser = function(db, callback) {
 	   "lName" : query.lName,
 	   "email" : query.email,
 	   "uName" : UNameInLowerCase,
-	   "passWord" : query.passWord,
-	   "cPassWord" : query.cPassWord
+	   "passWord" : query.passWord
    }, function(err, result) {
     assert.equal(err, null);
     console.log("Inserted a document into the paninkathUsers collection.");
@@ -150,6 +150,15 @@ app.get('/loginUser', function (req, res) {
 })
 
 app.get('/welcomeUser', function (req, res, next) {
+	
+	url = require('url');
+	url_parts = url.parse(req.url, true);
+	query = url_parts.query;
+		
+    establishConnectionWithDBase("validateToken", req, res);
+})
+
+app.get('/logout', function (req, res, next) {
 	
 	url = require('url');
 	url_parts = url.parse(req.url, true);
