@@ -47,6 +47,31 @@ var validateToken = function(db, req, res) {
 	
 };
 
+var checkUserNameAvailability = function(db, req, res, callback){
+	
+	db.collection('paninkathUsers').findOne({ "uName": query.userName.toLowerCase()}, function(err, user) {
+		
+	console.log("query.userName.toLowerCase()................. >> "+query.userName.toLowerCase());
+	  if (err) { 
+		callback();
+		return res.sendStatus(200);
+	  }
+	  
+	  if (!user) {
+		callback();
+		return res.sendStatus(200);
+	  }
+	  
+	  return res.sendStatus(401);
+
+	  
+	  callback();
+
+	});
+	
+	
+};
+
 var authenticateUser = function(db, req, res, callback) {
    
 	db.collection('paninkathUsers').findOne({ "uName": query.uName.toLowerCase(), "passWord": query.pwd}, function(err, user) {
@@ -54,31 +79,35 @@ var authenticateUser = function(db, req, res, callback) {
 	  if (err) { 
 		// user not found 
 		console.log("USER NOT Found....");
+		callback();
 		return res.sendStatus(401);
 	  }
 
 	  if (!user) {
 		// incorrect username
+		callback();
 		return res.sendStatus(401);
 	  }
 	  
-	var expires = moment().add(90000,'days').valueOf();
-	var token = jwt.encode({
+	  var expires = moment().add(90000,'days').valueOf();
+	  var token = jwt.encode({
 		uName: user.uName,
 		exp: expires
-	}, app.get('jwtTokenSecret'));
+	  }, app.get('jwtTokenSecret'));
 	
 
-	res.json({
+	  res.json({
 		token : token,
 		expires: expires,
 		user: JSON.stringify(user)
-	});
+	  });
+	
+		callback();
 
 	});
 };
 
-var addUser = function(db, callback) {	
+var addUser = function(db,req, res, callback) {	
 
    var UNameInLowerCase = query.userName.toLowerCase();
 	
@@ -91,7 +120,8 @@ var addUser = function(db, callback) {
 	   "passWord" : query.passWord
    }, function(err, result) {
     assert.equal(err, null);
-    console.log("Inserted a document into the paninkathUsers collection.");
+    console.log("Inserted a document into the paninkathUsers collection."+UNameInLowerCase);
+	return res.sendStatus("USER_ADDED");
     callback();
   });
 };
@@ -104,7 +134,7 @@ function establishConnectionWithDBase(operation, req, res){
 
 		if(operation === "addUser"){
 				
-			addUser(db, function() {
+			addUser(db,req, res, function() {
 				db.close();
 			});
 		}else if (operation === "authenticateUser"){
@@ -115,6 +145,11 @@ function establishConnectionWithDBase(operation, req, res){
 		}else if(operation === "validateToken"){
 			
 			validateToken(db, req, res);
+		}else if(operation === "checkUserNameAvailability"){
+			
+			checkUserNameAvailability(db, req, res, function() {
+				db.close();
+			});
 		}
 		
 
@@ -137,7 +172,7 @@ app.get('/addUser', function (req, res) {
 	url_parts = url.parse(req.url, true);
 	query = url_parts.query;
 	
-	establishConnectionWithDBase("addUser");
+	establishConnectionWithDBase("addUser", req, res);
 	
 })
 
@@ -158,6 +193,16 @@ app.get('/welcomeUser', function (req, res, next) {
     establishConnectionWithDBase("validateToken", req, res);
 })
 
+app.get('/checkUserNameAvailability', function (req, res, next) {
+	
+	url = require('url');
+	url_parts = url.parse(req.url, true);
+	query = url_parts.query;
+		
+    establishConnectionWithDBase("checkUserNameAvailability", req, res);
+})
+
+
 app.get('/logout', function (req, res, next) {
 	
 	url = require('url');
@@ -172,6 +217,6 @@ var server = app.listen(3800, function () {
   var host = server.address().address
   var port = server.address().port
 
-  console.log("Example app listening at http://%s:%s", host, port);
+  console.log("Example app listening at http://119.18.52.6:", port);
 
 })
