@@ -3,6 +3,7 @@ var app = express();
 var jwt = require('jwt-simple');
 var fs = require("fs");
 var moment = require("moment");
+var request = require('request');
 
 app.set('jwtTokenSecret', 'PANINKATH_SECRET');
 
@@ -116,6 +117,7 @@ var addUser = function(db,req, res, callback) {
 	   "fName" : query.fName,
 	   "lName" : query.lName,
 	   "email" : query.email,
+	   "mobile" : query.uMobile,
 	   "uName" : UNameInLowerCase,
 	   "passWord" : query.passWord
    }, function(err, result) {
@@ -166,6 +168,47 @@ app.use(function(req, res, next) {
   next();
 });
 
+app.get('/getOTP', function (req, res) {
+	
+	request.get({ url: "https://2factor.in/API/V1/c5db2602-72a3-11e6-a584-00163ef91450/SMS/8805288200/AUTOGEN/verify"}, 
+		function(error, response, body) { 
+			if (!error && response.statusCode == 200) { 
+
+				 res.json({
+					sId: JSON.parse(response.body).Details
+				});
+
+			} else{
+				
+				console.log("Failed.............."+JSON.stringify(error));
+				res.sendStatus(401);
+			}
+    });
+	
+});
+
+app.get('/validateOTP', function (req, res) {
+	
+	console.log(""+(require('url').parse(req.url, true).query.vCode));
+	
+	request.get({ url: "https://2factor.in/API/V1/c5db2602-72a3-11e6-a584-00163ef91450/SMS/VERIFY/"+require('url').parse(req.url, true).query.sId+"/"+require('url').parse(req.url, true).query.vCode}, 
+		function(error, response, body) { 
+			if (!error && response.statusCode == 200) { 
+                 // res.json(body); 
+				 console.log("OTP Matched!!!!!");
+				 res.sendStatus(200);
+			} else{
+				
+				console.log("Failed.............."+JSON.stringify(error));
+				res.sendStatus(401);
+			}
+    });
+	
+	
+	//https://2factor.in/API/V1/{api_key}/SMS/VERIFY/{session_id}/{otp_entered_by_user}
+	
+});
+
 app.get('/addUser', function (req, res) {
 	
 	url = require('url');
@@ -173,6 +216,9 @@ app.get('/addUser', function (req, res) {
 	query = url_parts.query;
 	
 	establishConnectionWithDBase("addUser", req, res);
+	
+	
+	
 	
 })
 
