@@ -31,10 +31,10 @@ var validateToken = function(db, req, res) {
 				res.end('Access token has expired', 400);
 			}else{
 				
-				db.collection('paninkathUsers').findOne({ "uName": decoded.uName }, function(err, user) {
+				db.collection('paninkathUsers').findOne({ "uNumber": decoded.uNumber }, function(err, user) {
 					req.user = user;
-					return res.sendStatus(200);
 					console.log("TOKEN VALIDATED>>......");
+					return res.sendStatus(200);					
 				});
 			}
 
@@ -50,9 +50,10 @@ var validateToken = function(db, req, res) {
 
 var checkUserNameAvailability = function(db, req, res, callback){
 	
-	db.collection('paninkathUsers').findOne({ "uName": query.userName.toLowerCase()}, function(err, user) {
+	console.log("query.nUNumber>>>> "+query.nUNumber);
+	
+	db.collection('paninkathUsers').findOne({ "uNumber": query.nUNumber}, function(err, user) {
 		
-	console.log("query.userName.toLowerCase()................. >> "+query.userName.toLowerCase());
 	  if (err) { 
 		callback();
 		return res.sendStatus(200);
@@ -75,7 +76,7 @@ var checkUserNameAvailability = function(db, req, res, callback){
 
 var authenticateUser = function(db, req, res, callback) {
    
-	db.collection('paninkathUsers').findOne({ "uName": query.uName.toLowerCase(), "passWord": query.pwd}, function(err, user) {
+	db.collection('paninkathUsers').findOne({ "uNumber": query.uNumber, "passWord": query.pwd}, function(err, user) {
 		
 	  if (err) { 
 		// user not found 
@@ -92,7 +93,7 @@ var authenticateUser = function(db, req, res, callback) {
 	  
 	  var expires = moment().add(90000,'days').valueOf();
 	  var token = jwt.encode({
-		uName: user.uName,
+		uNumber: user.uNumber,
 		exp: expires
 	  }, app.get('jwtTokenSecret'));
 	
@@ -110,19 +111,16 @@ var authenticateUser = function(db, req, res, callback) {
 
 var addUser = function(db,req, res, callback) {	
 
-   var UNameInLowerCase = query.userName.toLowerCase();
 	
    db.collection('paninkathUsers').insertOne( {
 	   
 	   "fName" : query.fName,
 	   "lName" : query.lName,
-	   "email" : query.email,
-	   "mobile" : query.uMobile,
-	   "uName" : UNameInLowerCase,
+	   "uNumber" : query.nUNumber,
 	   "passWord" : query.passWord
    }, function(err, result) {
     assert.equal(err, null);
-    console.log("Inserted a document into the paninkathUsers collection."+UNameInLowerCase);
+    console.log("Inserted a document into the paninkathUsers collection.");
 	return res.sendStatus("USER_ADDED");
     callback();
   });
@@ -170,7 +168,7 @@ app.use(function(req, res, next) {
 
 app.get('/getOTP', function (req, res) {
 	
-	request.get({ url: "https://2factor.in/API/V1/c5db2602-72a3-11e6-a584-00163ef91450/SMS/8805288200/AUTOGEN/verify"}, 
+	request.get({ url: "https://2factor.in/API/V1/c5db2602-72a3-11e6-a584-00163ef91450/SMS/"+require('url').parse(req.url, true).query.phone+"/AUTOGEN/verifyNumber"}, 
 		function(error, response, body) { 
 			if (!error && response.statusCode == 200) { 
 
@@ -205,9 +203,48 @@ app.get('/validateOTP', function (req, res) {
     });
 	
 	
-	//https://2factor.in/API/V1/{api_key}/SMS/VERIFY/{session_id}/{otp_entered_by_user}
+});
+
+app.get('/getTP', function (req, res) {
+	
+	request.get({ url: "https://2factor.in/API/V1/c5db2602-72a3-11e6-a584-00163ef91450/SMS/"+require('url').parse(req.url, true).query.phone+"/AUTOGEN/forgotPassword"}, 
+		function(error, response, body) { 
+			if (!error && response.statusCode == 200) { 
+
+				 res.json({
+					sId: JSON.parse(response.body).Details
+				});
+
+			} else{
+				
+				console.log("Failed.............."+JSON.stringify(error));
+				res.sendStatus(401);
+			}
+    });
+	
 	
 });
+
+app.get('/validateTP', function (req, res) {
+	
+	console.log(""+(require('url').parse(req.url, true).query.vCode));
+	
+	request.get({ url: "https://2factor.in/API/V1/c5db2602-72a3-11e6-a584-00163ef91450/SMS/VERIFY/"+require('url').parse(req.url, true).query.sId+"/"+require('url').parse(req.url, true).query.tmpPwd}, 
+		function(error, response, body) { 
+			if (!error && response.statusCode == 200) { 
+                 // res.json(body); 
+				 console.log("TP Verified!!!!!");
+				 res.sendStatus(200);
+			} else{
+				
+				console.log("Failed.............."+JSON.stringify(error));
+				res.sendStatus(401);
+			}
+    });
+	
+	
+});
+
 
 app.get('/addUser', function (req, res) {
 	
@@ -230,7 +267,7 @@ app.get('/loginUser', function (req, res) {
     establishConnectionWithDBase("authenticateUser", req, res);
 })
 
-app.get('/welcomeUser', function (req, res, next) {
+app.get('/validateLoggedInUser', function (req, res, next) {
 	
 	url = require('url');
 	url_parts = url.parse(req.url, true);
