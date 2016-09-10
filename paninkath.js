@@ -50,9 +50,9 @@ var validateToken = function(db, req, res) {
 
 var checkUserNameAvailability = function(db, req, res, callback){
 	
-	console.log("query.nUNumber>>>> "+query.nUNumber);
+	console.log("query.phone>>>> "+query.phone);
 	
-	db.collection('paninkathUsers').findOne({ "uNumber": query.nUNumber}, function(err, user) {
+	db.collection('paninkathUsers').findOne({ "uNumber": query.phone}, function(err, user) {
 		
 	  if (err) { 
 		callback();
@@ -109,6 +109,28 @@ var authenticateUser = function(db, req, res, callback) {
 	});
 };
 
+var updatePassword = function(db,req, res, callback) {	
+
+	db.collection('paninkathUsers').updateOne({ "uNumber": query.phone },
+		{
+			$set: {
+				passWord:query.newPwd
+			}
+			
+		},
+		{
+			upsert: true
+		}, function(err, result) {
+				assert.equal(err, null);
+				console.log("Password updated.");
+				callback();
+				return res.sendStatus("PASSWORD_UPDATED");
+				
+		});
+   
+};
+
+
 var addUser = function(db,req, res, callback) {	
 
 	
@@ -121,8 +143,9 @@ var addUser = function(db,req, res, callback) {
    }, function(err, result) {
     assert.equal(err, null);
     console.log("Inserted a document into the paninkathUsers collection.");
+	callback();
 	return res.sendStatus("USER_ADDED");
-    callback();
+    
   });
 };
 
@@ -148,6 +171,11 @@ function establishConnectionWithDBase(operation, req, res){
 		}else if(operation === "checkUserNameAvailability"){
 			
 			checkUserNameAvailability(db, req, res, function() {
+				db.close();
+			});
+		}else if(operation === "updatePassword"){
+			
+			updatePassword(db, req, res, function() {
 				db.close();
 			});
 		}
@@ -244,6 +272,19 @@ app.get('/validateTP', function (req, res) {
 	
 	
 });
+
+app.get('/updatePassword', function (req, res) {
+	
+	url = require('url');
+	url_parts = url.parse(req.url, true);
+	query = url_parts.query;
+	
+	establishConnectionWithDBase("updatePassword", req, res);
+	
+	
+	
+	
+})
 
 
 app.get('/addUser', function (req, res) {
