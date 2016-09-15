@@ -31,10 +31,16 @@ var validateToken = function(db, req, res) {
 				res.end('Access token has expired', 400);
 			}else{
 				
-				db.collection('paninkathUsers').findOne({ "uNumber": decoded.uNumber }, function(err, user) {
-					req.user = user;
-					console.log("TOKEN VALIDATED>>......");
-					return res.sendStatus(200);					
+				db.collection('paninkathUsers').findOne({ "uName": decoded.uName }, function(err, user) {
+					if(user){
+							
+						req.user = user;
+						console.log("TOKEN VALIDATED>>......"+req.user.fName);
+						return res.sendStatus(200);
+					}
+					
+					return res.sendStatus(401);
+										
 				});
 			}
 
@@ -48,11 +54,52 @@ var validateToken = function(db, req, res) {
 	
 };
 
+var getTp = function(db, req, res, callback){
+	
+	console.log("query.uName............................. !! >> "+query.uName);
+	
+	db.collection('paninkathUsers').findOne({ "uName": query.uName}, function(err, user) {
+		
+	  if (err) { 
+		callback();
+		return res.sendStatus(200);
+	  }
+	  
+	  if (!user) {
+		callback();
+		return res.sendStatus(200);
+	  }
+	  
+	  console.log("user.phone................ >> "+user.uNumber);
+	  
+		request.get({ url: "https://2factor.in/API/V1/c5db2602-72a3-11e6-a584-00163ef91450/SMS/"+user.uNumber+"/AUTOGEN/forgotPassword"}, 
+			function(error, response, body) { 
+				if (!error && response.statusCode == 200) { 
+
+					res.json({
+					sId: JSON.parse(response.body).Details
+				});
+
+				} else{
+				
+					console.log("Failed.............."+JSON.stringify(error));
+					res.sendStatus(401);
+				}
+		});
+
+	  
+	  callback();
+
+	});
+	
+	
+};
+
+
 var checkUserNameAvailability = function(db, req, res, callback){
 	
-	console.log("query.phone>>>> "+query.phone);
 	
-	db.collection('paninkathUsers').findOne({ "uNumber": query.phone}, function(err, user) {
+	db.collection('paninkathUsers').findOne({ "uName": query.uName}, function(err, user) {
 		
 	  if (err) { 
 		callback();
@@ -76,7 +123,7 @@ var checkUserNameAvailability = function(db, req, res, callback){
 
 var authenticateUser = function(db, req, res, callback) {
    
-	db.collection('paninkathUsers').findOne({ "uNumber": query.uNumber, "passWord": query.pwd}, function(err, user) {
+	db.collection('paninkathUsers').findOne({ "uName": query.uName, "passWord": query.pwd}, function(err, user) {
 		
 	  if (err) { 
 		// user not found 
@@ -93,7 +140,7 @@ var authenticateUser = function(db, req, res, callback) {
 	  
 	  var expires = moment().add(90000,'days').valueOf();
 	  var token = jwt.encode({
-		uNumber: user.uNumber,
+		uName: user.uName,
 		exp: expires
 	  }, app.get('jwtTokenSecret'));
 	
@@ -111,7 +158,7 @@ var authenticateUser = function(db, req, res, callback) {
 
 var updatePassword = function(db,req, res, callback) {	
 
-	db.collection('paninkathUsers').updateOne({ "uNumber": query.phone },
+	db.collection('paninkathUsers').updateOne({ "uName": query.uName },
 		{
 			$set: {
 				passWord:query.newPwd
@@ -133,12 +180,20 @@ var updatePassword = function(db,req, res, callback) {
 
 var addUser = function(db,req, res, callback) {	
 
+	/*var phone = require('node-phonenumber')
+ 
+	var phoneUtil = phone.PhoneNumberUtil.getInstance();
+	var phoneNumber = phoneUtil.parse(query.nUNumber,'IN');
+	var toNumber = phoneUtil.format(phoneNumber, phone.PhoneNumberFormat.INTERNATIONAL);
+	
+	console.log("toNumber............................... "+toNumber);*/
 	
    db.collection('paninkathUsers').insertOne( {
 	   
 	   "fName" : query.fName,
 	   "lName" : query.lName,
 	   "uNumber" : query.nUNumber,
+	   "uName" : query.nUName.toLowerCase(),
 	   "passWord" : query.passWord
    }, function(err, result) {
     assert.equal(err, null);
@@ -176,6 +231,12 @@ function establishConnectionWithDBase(operation, req, res){
 		}else if(operation === "updatePassword"){
 			
 			updatePassword(db, req, res, function() {
+				db.close();
+			});
+		}else if(operation === "getTp"){
+			
+			getTp(db, req, res, function(){
+				
 				db.close();
 			});
 		}
@@ -233,22 +294,16 @@ app.get('/validateOTP', function (req, res) {
 	
 });
 
-app.get('/getTP', function (req, res) {
+app.get('/getTP', function (req, res) {//
+
+
+	url = require('url');
+	url_parts = url.parse(req.url, true);
+	query = url_parts.query;
 	
-	request.get({ url: "https://2factor.in/API/V1/c5db2602-72a3-11e6-a584-00163ef91450/SMS/"+require('url').parse(req.url, true).query.phone+"/AUTOGEN/forgotPassword"}, 
-		function(error, response, body) { 
-			if (!error && response.statusCode == 200) { 
-
-				 res.json({
-					sId: JSON.parse(response.body).Details
-				});
-
-			} else{
-				
-				console.log("Failed.............."+JSON.stringify(error));
-				res.sendStatus(401);
-			}
-    });
+	establishConnectionWithDBase("getTp", req, res);
+	
+	
 	
 	
 });
