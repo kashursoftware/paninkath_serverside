@@ -123,7 +123,9 @@ var checkUserNameAvailability = function(db, req, res, callback){
 
 var authenticateUser = function(db, req, res, callback) {
    
-	db.collection('paninkathUsers').findOne({ "uName": query.uName, "passWord": query.pwd}, function(err, user) {
+   console.log("query.uName................ "+query.uName);
+   console.log("query.pwd................ "+query.pwd);
+	db.collection('paninkathUsers').findOne({ "uName": query.uName.toLowerCase(), "passWord": query.pwd}, function(err, user) {
 		
 	  if (err) { 
 		// user not found 
