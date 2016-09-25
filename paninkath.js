@@ -95,6 +95,40 @@ var getTp = function(db, req, res, callback){
 	
 };
 
+var updateProfilePic = function(db, req, res, callback){
+	
+	console.log("query.displayPic.. "+query.displayPic);
+};
+
+
+var searchUsers = function(db, req, res, callback){
+	
+	var searchCriteria = { $regex: new RegExp("^" + query.searchText.toLowerCase(), "i") };
+	var userList = {list:[]};
+	
+	 var cursor = db.collection('paninkathUsers').find(
+       { $or: [ { "fName":  searchCriteria }, { "lName": searchCriteria },  {"uNumber": searchCriteria }] },{"fName":1,"lName":1,"uNumber":1}
+   );
+   
+	
+	cursor.each(function(err, doc) {
+      assert.equal(err, null);
+      if (doc != null) {
+         console.dir(doc.lName);
+		 console.log(doc);
+		 userList.list.push(doc);
+		 
+      } else {
+		 
+		res.json({
+			user: JSON.stringify(userList)
+		});
+		
+         callback();
+      }
+   });
+	
+};
 
 var checkUserNameAvailability = function(db, req, res, callback){
 	
@@ -241,6 +275,19 @@ function establishConnectionWithDBase(operation, req, res){
 				
 				db.close();
 			});
+		}else if(operation === "searchUsers"){
+			
+			searchUsers(db, req, res, function(){
+				
+				db.close();
+			});
+			
+		}else if(operation === "updateProfilePic"){
+			
+			updateProfilePic(db, req, res, function(){
+				
+				db.close();
+			});
 		}
 		
 
@@ -381,6 +428,24 @@ app.get('/checkUserNameAvailability', function (req, res, next) {
 	query = url_parts.query;
 		
     establishConnectionWithDBase("checkUserNameAvailability", req, res);
+})
+
+app.get('/searchUsers', function (req, res, next) {
+	
+	url = require('url');
+	url_parts = url.parse(req.url, true);
+	query = url_parts.query;
+	
+    establishConnectionWithDBase("searchUsers", req, res);
+})
+
+app.get('/updateProfilePic', function (req, res, next) {
+	
+	url = require('url');
+	url_parts = url.parse(req.url, true);
+	query = url_parts.query;
+	
+    establishConnectionWithDBase("updateProfilePic", req, res);
 })
 
 
