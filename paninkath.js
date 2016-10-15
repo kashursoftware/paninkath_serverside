@@ -18,8 +18,7 @@ var query;
 
 
 
-var validateToken = function(db, req, res) {
-	
+var validateToken = function(db, req, res, isdataRequest) {
 	
 	var token = (req.body && req.body.access_token) || (req.query && req.query.access_token) || req.headers['x-auth-token'];
 
@@ -36,6 +35,22 @@ var validateToken = function(db, req, res) {
 							
 						req.user = user;
 						console.log("TOKEN VALIDATED>>......"+req.user.fName);
+						if(isdataRequest == "updateProfilePic"){
+							
+							updateProfilePic(db, req, res, function(){
+								db.close();
+							});
+							
+							return;
+						}else if(isdataRequest == "getProfilePic"){
+							
+							getProfilePic(db, req, res, function(){
+								db.close();
+							});
+							
+							return;
+							
+						}
 						return res.sendStatus(200);
 					}
 					
@@ -95,9 +110,61 @@ var getTp = function(db, req, res, callback){
 	
 };
 
+
+
+var getProfilePic = function(db, req, res, callback){
+	
+	
+	console.log("pic requested.....");
+	db.collection('paninkathUsers').findOne({ "uName": req.user.uName}, function(err, user) {
+		
+	  if (err) { 
+		// user not found 
+		console.log("USER NOT Found....");
+		callback();
+		return res.sendStatus(401);
+	  }
+
+	  if (!user) {
+		// incorrect username
+		callback();
+		return res.sendStatus(401);
+	  }
+	  
+	  res.json({
+		profilePic: user.uPic,
+	  });
+	  
+	  
+	  callback();
+
+	});
+	//
+};
+
 var updateProfilePic = function(db, req, res, callback){
 	
-	console.log("query.displayPic.. "+query.displayPic);
+	
+	
+	db.collection('paninkathUsers').updateOne({ "uName": req.user.uName },
+		{
+			$set: {
+				uPic:query.displayPic,
+			}
+			
+		},
+		{
+			upsert: true
+		}, function(err, result) {
+				assert.equal(err, null);
+				console.log("Pic updated.");
+				callback();
+				return res.sendStatus("PIC_UPDATED");
+				
+		});
+		
+		callback();
+	//
 };
 
 
@@ -107,7 +174,7 @@ var searchUsers = function(db, req, res, callback){
 	var userList = {list:[]};
 	
 	 var cursor = db.collection('paninkathUsers').find(
-       { $or: [ { "fName":  searchCriteria }, { "lName": searchCriteria },  {"uNumber": searchCriteria }] },{"fName":1,"lName":1,"uNumber":1}
+       { $or: [ { "fName":  searchCriteria }, { "lName": searchCriteria },  {"uNumber": searchCriteria }, {"fullName": searchCriteria}, {"uName": searchCriteria}] },{"uName":1,"fName":1,"lName":1,"uNumber":1,"fullName":1,"uPic":1}
    );
    
 	
@@ -194,7 +261,7 @@ var authenticateUser = function(db, req, res, callback) {
 
 var updatePassword = function(db,req, res, callback) {	
 
-	db.collection('paninkathUsers').updateOne({ "uName": query.uName },
+	db.collection('paninkathUsers').updateOne({ "uName": query.uName.toLowerCase()},
 		{
 			$set: {
 				passWord:query.newPwd
@@ -230,7 +297,8 @@ var addUser = function(db,req, res, callback) {
 	   "lName" : query.lName,
 	   "uNumber" : query.nUNumber,
 	   "uName" : query.nUName.toLowerCase(),
-	   "passWord" : query.passWord
+	   "passWord" : query.passWord,
+	   "fullName" : query.fName +" "+ query.lName
    }, function(err, result) {
     assert.equal(err, null);
     console.log("Inserted a document into the paninkathUsers collection.");
@@ -284,10 +352,11 @@ function establishConnectionWithDBase(operation, req, res){
 			
 		}else if(operation === "updateProfilePic"){
 			
-			updateProfilePic(db, req, res, function(){
-				
-				db.close();
-			});
+			validateToken(db, req, res, "updateProfilePic");
+			
+		}else if(operation == "getProfilePic"){
+			
+			validateToken(db, req, res, "getProfilePic");
 		}
 		
 
@@ -447,6 +516,17 @@ app.get('/updateProfilePic', function (req, res, next) {
 	
     establishConnectionWithDBase("updateProfilePic", req, res);
 })
+
+app.get('/getProfilePic', function (req, res, next) {
+	
+	url = require('url');
+	url_parts = url.parse(req.url, true);
+	query = url_parts.query;
+	
+    establishConnectionWithDBase("getProfilePic", req, res);
+})
+
+
 
 
 app.get('/logout', function (req, res, next) {
