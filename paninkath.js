@@ -35,6 +35,10 @@ var validateToken = function(db, req, res, isdataRequest) {
 							
 						req.user = user;
 						console.log("TOKEN VALIDATED>>......"+req.user.fName);
+						
+	
+						console.log("pushMessage.............................");
+						
 						if(isdataRequest == "updateProfilePic"){
 							
 							updateProfilePic(db, req, res, function(){
@@ -170,6 +174,8 @@ var updateProfilePic = function(db, req, res, callback){
 
 var searchUsers = function(db, req, res, callback){
 	
+	pushMessage();
+	
 	var searchCriteria = { $regex: new RegExp("^" + query.searchText.toLowerCase(), "i") };
 	var userList = {list:[]};
 	
@@ -223,6 +229,8 @@ var checkUserNameAvailability = function(db, req, res, callback){
 };
 
 var authenticateUser = function(db, req, res, callback) {
+	
+	
    
    console.log("query.uName................ "+query.uName);
    console.log("query.pwd................ "+query.pwd);
@@ -365,6 +373,49 @@ function establishConnectionWithDBase(operation, req, res){
 
 };
 
+function pushMessage(){
+
+	var gcm = require('node-gcm');
+
+	// Set up the sender with your GCM/FCM API key (declare this once for multiple messages)
+	var sender = new gcm.Sender('AIzaSyCq2qdYcjFCVmCRhLrpRouJ4YU9nOQrmlY');
+
+	// Prepare a message to be sent
+	var message = new gcm.Message({
+		delayWhileIdle: true,
+		restrictedPackageName: "com.paninkath",
+		priority: 'high',
+		//dryRun: true,
+		data: { key1: 'msg1' },
+		notification: {
+			title: "First Paninkath Message",
+			icon: "ic_launcher",
+			body: "Paninkath on the way..!!",
+			sound:"default"
+			
+		}
+	});
+	message.addData('force-start', 1);
+	message.addData('content-available', 1);
+	
+	
+	// Specify which registration IDs to deliver the message to
+	var regTokens = ['dxo7ZKX-lzc:APA91bEoE29wG98D9Q4-4OcoK7Sp4jzWX6PMWqgFJ7JVAklpMWRD_zD9ryPJwH1_0o_jsf-bD0LDUs3g-ZHFORp3YnhYyzJakhFLv6aYi6joEFye0uEnx9QRrKiZJ2OirjDBtU2Wo_XU'];
+	
+	// Actually send the message
+	sender.send(message, { registrationTokens: regTokens }, function (err, response) {
+		if (err){
+			
+			console.error("Failed: "+err);
+		} 
+		else{
+			
+			console.log("Success: "+response);
+		} 
+	});
+	
+};
+
 //Disabled CORSE to allow access from any origin
 app.use(function(req, res, next) {
   res.header("Access-Control-Allow-Origin", "*");
@@ -479,9 +530,12 @@ app.get('/loginUser', function (req, res) {
 	url_parts = url.parse(req.url, true);
 	query = url_parts.query;
     establishConnectionWithDBase("authenticateUser", req, res);
+	
+	
 })
 
 app.get('/validateLoggedInUser', function (req, res, next) {
+	
 	
 	url = require('url');
 	url_parts = url.parse(req.url, true);
@@ -546,3 +600,5 @@ var server = app.listen(3800, function () {
   console.log("Example app listening at http://119.18.52.6:", port);
 
 })
+
+
