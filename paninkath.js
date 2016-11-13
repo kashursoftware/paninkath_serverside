@@ -36,9 +36,6 @@ var validateToken = function(db, req, res, isdataRequest) {
 						req.user = user;
 						console.log("TOKEN VALIDATED>>......"+req.user.fName);
 						
-	
-						console.log("pushMessage.............................");
-						
 						if(isdataRequest == "updateProfilePic"){
 							
 							updateProfilePic(db, req, res, function(){
@@ -49,6 +46,22 @@ var validateToken = function(db, req, res, isdataRequest) {
 						}else if(isdataRequest == "getProfilePic"){
 							
 							getProfilePic(db, req, res, function(){
+								db.close();
+							});
+							
+							return;
+							
+						}else if(isdataRequest === "setUserRegisteredKey"){
+							
+							setUserRegisteredKey(db, req, res, function(){
+								db.close();
+							});
+							
+							return;
+							
+						}else if(isdataRequest === "sendFriendRequest"){
+							
+							sendFriendRequest(db, req, res, function(){
 								db.close();
 							});
 							
@@ -146,6 +159,59 @@ var getProfilePic = function(db, req, res, callback){
 	//
 };
 
+var sendFriendRequest = function(db, req, res, callback){
+	
+	
+	
+	db.collection('paninkathUsers').findOne({ "uName": query.toUName}, function(err, user) {
+		
+	  if (err) { 
+		callback();
+		return res.sendStatus(200);
+	  }
+	  
+	  if (!user) {
+		callback();
+		return res.sendStatus(200);
+	  }
+	  
+	  pushMessage(query.fName+" "+query.lName, user.uRegKey);
+	  
+	  return res.sendStatus(401);
+
+	  
+	  callback();
+
+	});
+	
+};
+
+var setUserRegisteredKey = function(db, req, res, callback){
+	
+	console.log("req.user.uName.... "+req.user.uName);
+	
+	db.collection('paninkathUsers').updateOne({ "uName": req.user.uName },
+		{
+			$set: {
+				uRegKey:query.regKey,
+			}
+			
+		},
+		{
+			upsert: true
+		}, function(err, result) {
+				assert.equal(err, null);
+				console.log("key updated.");
+				callback();
+				
+				return res.sendStatus("KEY_UPDATED");
+				
+		});
+		
+		callback();
+	//
+};
+
 var updateProfilePic = function(db, req, res, callback){
 	
 	
@@ -174,13 +240,11 @@ var updateProfilePic = function(db, req, res, callback){
 
 var searchUsers = function(db, req, res, callback){
 	
-	pushMessage();
-	
 	var searchCriteria = { $regex: new RegExp("^" + query.searchText.toLowerCase(), "i") };
 	var userList = {list:[]};
 	
 	 var cursor = db.collection('paninkathUsers').find(
-       { $or: [ { "fName":  searchCriteria }, { "lName": searchCriteria },  {"uNumber": searchCriteria }, {"fullName": searchCriteria}, {"uName": searchCriteria}] },{"uName":1,"fName":1,"lName":1,"uNumber":1,"fullName":1,"uPic":1}
+       { $or: [ { "fName":  searchCriteria }, { "lName": searchCriteria },  {"uNumber": searchCriteria }, {"fullName": searchCriteria}, {"uName": searchCriteria}] },{"uName":1,"fName":1,"lName":1,"uNumber":1,"fullName":1,"uPic":1,"uRegKey":1}//
    );
    
 	
@@ -188,7 +252,6 @@ var searchUsers = function(db, req, res, callback){
       assert.equal(err, null);
       if (doc != null) {
          console.dir(doc.lName);
-		 console.log(doc);
 		 userList.list.push(doc);
 		 
       } else {
@@ -232,13 +295,10 @@ var authenticateUser = function(db, req, res, callback) {
 	
 	
    
-   console.log("query.uName................ "+query.uName);
-   console.log("query.pwd................ "+query.pwd);
 	db.collection('paninkathUsers').findOne({ "uName": query.uName.toLowerCase(), "passWord": query.pwd}, function(err, user) {
 		
 	  if (err) { 
 		// user not found 
-		console.log("USER NOT Found....");
 		callback();
 		return res.sendStatus(401);
 	  }
@@ -280,7 +340,6 @@ var updatePassword = function(db,req, res, callback) {
 			upsert: true
 		}, function(err, result) {
 				assert.equal(err, null);
-				console.log("Password updated.");
 				callback();
 				return res.sendStatus("PASSWORD_UPDATED");
 				
@@ -366,6 +425,14 @@ function establishConnectionWithDBase(operation, req, res){
 			
 			validateToken(db, req, res, "getProfilePic");
 		}
+		else if(operation == "setUserRegisteredKey"){
+			
+			validateToken(db, req, res, "setUserRegisteredKey");
+		}
+		else if(operation === "sendFriendRequest"){
+			
+			validateToken(db, req, res, "sendFriendRequest");
+		}
 		
 
 		});
@@ -373,7 +440,7 @@ function establishConnectionWithDBase(operation, req, res){
 
 };
 
-function pushMessage(){
+function pushMessage(fromName, toRegKey){
 
 	var gcm = require('node-gcm');
 
@@ -388,19 +455,21 @@ function pushMessage(){
 		//dryRun: true,
 		data: { key1: 'msg1' },
 		notification: {
-			title: "First Paninkath Message",
+			title: "You got a friend request from",
 			icon: "ic_launcher",
-			body: "Paninkath on the way..!!",
+			body: fromName,
 			sound:"default"
 			
 		}
 	});
 	message.addData('force-start', 1);
 	message.addData('content-available', 1);
+	message.addData('badge', 7);
 	
 	
 	// Specify which registration IDs to deliver the message to
-	var regTokens = ['dxo7ZKX-lzc:APA91bEoE29wG98D9Q4-4OcoK7Sp4jzWX6PMWqgFJ7JVAklpMWRD_zD9ryPJwH1_0o_jsf-bD0LDUs3g-ZHFORp3YnhYyzJakhFLv6aYi6joEFye0uEnx9QRrKiZJ2OirjDBtU2Wo_XU'];
+	var regTokens = [toRegKey];//'dxo7ZKX-lzc:APA91bEoE29wG98D9Q4-4OcoK7Sp4jzWX6PMWqgFJ7JVAklpMWRD_zD9ryPJwH1_0o_jsf-bD0LDUs3g-ZHFORp3YnhYyzJakhFLv6aYi6joEFye0uEnx9QRrKiZJ2OirjDBtU2Wo_XU'];
+	console.log("tmp.............."+toRegKey);
 	
 	// Actually send the message
 	sender.send(message, { registrationTokens: regTokens }, function (err, response) {
@@ -570,6 +639,25 @@ app.get('/updateProfilePic', function (req, res, next) {
 	
     establishConnectionWithDBase("updateProfilePic", req, res);
 })
+
+app.get('/setUserRegisteredKey', function (req, res, next) {
+	
+	url = require('url');
+	url_parts = url.parse(req.url, true);
+	query = url_parts.query;
+	
+    establishConnectionWithDBase("setUserRegisteredKey", req, res);
+})
+
+app.get('/sendFriendRequest', function (req, res, next) {
+	
+	url = require('url');
+	url_parts = url.parse(req.url, true);
+	query = url_parts.query;
+	
+    establishConnectionWithDBase("sendFriendRequest", req, res);
+})
+
 
 app.get('/getProfilePic', function (req, res, next) {
 	
