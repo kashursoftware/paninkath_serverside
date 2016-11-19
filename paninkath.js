@@ -20,6 +20,8 @@ var query;
 
 var validateToken = function(db, req, res, isdataRequest) {
 	
+	console.log("isdataRequest............................. :"+isdataRequest);
+	
 	var token = (req.body && req.body.access_token) || (req.query && req.query.access_token) || req.headers['x-auth-token'];
 
 	if (token) {
@@ -59,6 +61,14 @@ var validateToken = function(db, req, res, isdataRequest) {
 							
 							return;
 							
+						}else if(isdataRequest === "removeUserRegisteredKey"){
+						
+							removeUserRegisteredKey(db, req, res, function(){
+								db.close();
+							});
+							
+							return;
+						
 						}else if(isdataRequest === "sendFriendRequest"){
 							
 							sendFriendRequest(db, req, res, function(){
@@ -174,8 +184,8 @@ var sendFriendRequest = function(db, req, res, callback){
 		callback();
 		return res.sendStatus(200);
 	  }
-	  
-	  pushMessage(query.fName+" "+query.lName, user.uRegKey);
+	  console.log("user.uRegKey[0]..................>>> "+user.uRegKey[0]);
+	  pushMessage(query.fName+" "+query.lName, user.uRegKey[0]);
 	  
 	  return res.sendStatus(401);
 
@@ -186,6 +196,28 @@ var sendFriendRequest = function(db, req, res, callback){
 	
 };
 
+var removeUserRegisteredKey = function(db, req, res, callback){
+	
+	console.log("req.user.uName.... "+req.user.uName);
+	
+	db.collection('paninkathUsers').update({ "uName": req.user.uName },
+			{ 
+				$pull: { "uRegKey" :  query.regKey} 
+			},
+			function(err, result) {
+				assert.equal(err, null);
+				console.log("key removed.");
+				callback();
+				
+				return res.sendStatus("KEY_REMOVED");
+				
+		
+			});
+		
+		callback();
+	
+	
+};
 var setUserRegisteredKey = function(db, req, res, callback){
 	
 	console.log("req.user.uName.... "+req.user.uName);
@@ -193,7 +225,7 @@ var setUserRegisteredKey = function(db, req, res, callback){
 	db.collection('paninkathUsers').updateOne({ "uName": req.user.uName },
 		{
 			$set: {
-				uRegKey:query.regKey,
+				uRegKey:[query.regKey]
 			}
 			
 		},
@@ -377,6 +409,7 @@ var addUser = function(db,req, res, callback) {
 
 function establishConnectionWithDBase(operation, req, res){
 	
+	console.log("operation................... "+operation);
 	
 		MongoClient.connect(dataBsurl, function(err, db) {
 		assert.equal(null, err);
@@ -429,6 +462,10 @@ function establishConnectionWithDBase(operation, req, res){
 			
 			validateToken(db, req, res, "setUserRegisteredKey");
 		}
+		else if(operation === "removeUserRegisteredKey"){
+			
+			validateToken(db, req, res, "removeUserRegisteredKey");
+		}
 		else if(operation === "sendFriendRequest"){
 			
 			validateToken(db, req, res, "sendFriendRequest");
@@ -455,9 +492,9 @@ function pushMessage(fromName, toRegKey){
 		//dryRun: true,
 		data: { key1: 'msg1' },
 		notification: {
-			title: "You got a friend request from",
+			title: "You have a friend request from",
 			icon: "ic_launcher",
-			body: fromName,
+			body: fromName.toUpperCase(),
 			sound:"default"
 			
 		}
@@ -468,7 +505,7 @@ function pushMessage(fromName, toRegKey){
 	
 	
 	// Specify which registration IDs to deliver the message to
-	var regTokens = [toRegKey];//'dxo7ZKX-lzc:APA91bEoE29wG98D9Q4-4OcoK7Sp4jzWX6PMWqgFJ7JVAklpMWRD_zD9ryPJwH1_0o_jsf-bD0LDUs3g-ZHFORp3YnhYyzJakhFLv6aYi6joEFye0uEnx9QRrKiZJ2OirjDBtU2Wo_XU'];
+	var regTokens = [toRegKey];
 	console.log("tmp.............."+toRegKey);
 	
 	// Actually send the message
@@ -648,6 +685,17 @@ app.get('/setUserRegisteredKey', function (req, res, next) {
 	
     establishConnectionWithDBase("setUserRegisteredKey", req, res);
 })
+
+app.get('/removeUserRegisteredKey', function (req, res, next) {
+	
+	url = require('url');
+	url_parts = url.parse(req.url, true);
+	query = url_parts.query;
+	
+    establishConnectionWithDBase("removeUserRegisteredKey", req, res);
+})
+
+
 
 app.get('/sendFriendRequest', function (req, res, next) {
 	
