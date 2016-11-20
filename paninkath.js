@@ -36,7 +36,7 @@ var validateToken = function(db, req, res, isdataRequest) {
 					if(user){
 							
 						req.user = user;
-						console.log("TOKEN VALIDATED>>......"+req.user.fName);
+						console.log("TOKEN VALIDATED>>......"+req.user.fName + " "+isdataRequest);
 						
 						if(isdataRequest == "updateProfilePic"){
 							
@@ -45,7 +45,16 @@ var validateToken = function(db, req, res, isdataRequest) {
 							});
 							
 							return;
-						}else if(isdataRequest == "getProfilePic"){
+						}else if(isdataRequest === "searchFriendRequest"){
+							
+							searchFriendRequest(db, req, res, function(){
+								db.close();
+							});
+							
+							return;
+							
+						}
+						else if(isdataRequest == "getProfilePic"){
 							
 							getProfilePic(db, req, res, function(){
 								db.close();
@@ -173,7 +182,9 @@ var sendFriendRequest = function(db, req, res, callback){
 	
 	
 	
-	db.collection('paninkathUsers').findOne({ "uName": query.toUName}, function(err, user) {
+	db.collection('paninkathUsers').findOne({ "uName": query.toUName}, 
+	
+	function(err, user) {
 		
 	  if (err) { 
 		callback();
@@ -184,21 +195,33 @@ var sendFriendRequest = function(db, req, res, callback){
 		callback();
 		return res.sendStatus(200);
 	  }
-	  console.log("user.uRegKey[0]..................>>> "+user.uRegKey[0]);
-	  pushMessage(query.fName+" "+query.lName, user.uRegKey[0]);
-	  
-	  return res.sendStatus(401);
-
-	  
-	  callback();
+	  console.log("user.uRegKey[0]..................>>> "+user.uRegKey[0]);//
+	  pushMessage(query.fName+" "+query.lName, user.uRegKey);
 
 	});
+	
+	db.collection('paninkathUsers').updateOne({ "uName": query.toUName },
+		{
+			$addToSet: { "friendReq": query.uName } 
+			
+		},
+		{
+			upsert: true
+		}, function(err, result) {
+				assert.equal(err, null);
+				console.log("Friend request updated.");
+				callback();
+				return res.sendStatus("FRIEND_REQ_UPDATED");
+		});
+		
+		
 	
 };
 
 var removeUserRegisteredKey = function(db, req, res, callback){
 	
 	console.log("req.user.uName.... "+req.user.uName);
+	
 	
 	db.collection('paninkathUsers').update({ "uName": req.user.uName },
 			{ 
@@ -224,9 +247,12 @@ var setUserRegisteredKey = function(db, req, res, callback){
 	
 	db.collection('paninkathUsers').updateOne({ "uName": req.user.uName },
 		{
-			$set: {
-				uRegKey:[query.regKey]
-			}
+			/*$set: {
+				//uRegKey:[query.regKey]
+				$addToSet: { "uRegKey" :  query.regKey}
+			}*/
+			
+			$addToSet: { "uRegKey": query.regKey } 
 			
 		},
 		{
@@ -268,6 +294,66 @@ var updateProfilePic = function(db, req, res, callback){
 		callback();
 	//
 };
+
+var searchFriendRequest = function(db, req, res, callback){
+	
+	console.log("query.uName.....................................@@@ ::::: "+query.uName);
+	var friendReqList;
+	
+	db.collection('paninkathUsers').findOne({ "uName": query.uName}, function(err, user) {
+		
+	  if (err) { 
+		callback();
+		return res.sendStatus(200);
+	  }
+	  
+	  if (user) {
+		  
+		  console.log("WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW  friendReq:: "+user.friendReq);
+		  friendReqList = user.friendReq;
+		  searchUsersThatSentFriendRequest(friendReqList, db, req, res, callback);
+		  
+	  }
+
+	});
+	
+};
+
+var searchUsersThatSentFriendRequest = function(friendReqList, db, req, res, callback){
+	
+	var userArray = [];
+	
+	for (i = 0; i < friendReqList.length; i++){
+		
+		db.collection('paninkathUsers').findOne ({uName: friendReqList[i]}, function (error, UserInfo) {
+			
+			
+			if(UserInfo){
+					
+				userArray .push({"uName":UserInfo.uName, "fName":UserInfo.fName, "lName":UserInfo.lName, "uPic":UserInfo.uPic});
+				
+				if(userArray.length === friendReqList.length){
+						
+					res.json({
+						user: JSON.stringify(userArray)
+					});
+		
+					callback();
+					
+				}
+				
+			}/*else if(error){
+				
+				callback();
+				return res.sendStatus(200);
+			}*/
+			
+			
+		});
+	}
+	
+	
+}
 
 
 var searchUsers = function(db, req, res, callback){
@@ -382,13 +468,6 @@ var updatePassword = function(db,req, res, callback) {
 
 var addUser = function(db,req, res, callback) {	
 
-	/*var phone = require('node-phonenumber')
- 
-	var phoneUtil = phone.PhoneNumberUtil.getInstance();
-	var phoneNumber = phoneUtil.parse(query.nUNumber,'IN');
-	var toNumber = phoneUtil.format(phoneNumber, phone.PhoneNumberFormat.INTERNATIONAL);
-	
-	console.log("toNumber............................... "+toNumber);*/
 	
    db.collection('paninkathUsers').insertOne( {
 	   
@@ -397,7 +476,10 @@ var addUser = function(db,req, res, callback) {
 	   "uNumber" : query.nUNumber,
 	   "uName" : query.nUName.toLowerCase(),
 	   "passWord" : query.passWord,
-	   "fullName" : query.fName +" "+ query.lName
+	   "fullName" : query.fName +" "+ query.lName,
+	   "uRegKey": [],
+	   "friendReq": [],
+	   "friends": []
    }, function(err, result) {
     assert.equal(err, null);
     console.log("Inserted a document into the paninkathUsers collection.");
@@ -450,7 +532,12 @@ function establishConnectionWithDBase(operation, req, res){
 				db.close();
 			});
 			
-		}else if(operation === "updateProfilePic"){
+		}else if(operation === "searchFriendRequest"){
+			
+			validateToken(db, req, res, "searchFriendRequest");
+			
+		}
+		else if(operation === "updateProfilePic"){
 			
 			validateToken(db, req, res, "updateProfilePic");
 			
@@ -505,7 +592,7 @@ function pushMessage(fromName, toRegKey){
 	
 	
 	// Specify which registration IDs to deliver the message to
-	var regTokens = [toRegKey];
+	var regTokens = toRegKey;
 	console.log("tmp.............."+toRegKey);
 	
 	// Actually send the message
@@ -667,6 +754,16 @@ app.get('/searchUsers', function (req, res, next) {
 	
     establishConnectionWithDBase("searchUsers", req, res);
 })
+
+app.get('/searchFriendRequest', function (req, res, next) {
+	
+	url = require('url');
+	url_parts = url.parse(req.url, true);
+	query = url_parts.query;
+	
+    establishConnectionWithDBase("searchFriendRequest", req, res);
+})
+
 
 app.get('/updateProfilePic', function (req, res, next) {
 	
